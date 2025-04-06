@@ -335,8 +335,6 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 		buf.WriteString(";\n\n") // terminate the statement
 	}
 
-	buf.WriteString(");\n")
-
 	_, _ = buf.WriteString("\n\n")
 	return nil
 }
