@@ -300,7 +300,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 	columnNames := strings.Join(columns, ",")
 
 	if totalRow > 0 {
-		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES\n", table, columnNames))
+		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES ", table, columnNames))
 
 		rowIndex := 0
 		for rows.Next() {
@@ -326,7 +326,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 			}
 
 			if rowIndex > 0 {
-				buf.WriteString(",\n") // comma for previous row
+				buf.WriteString(",") // comma for previous row
 			}
 			buf.WriteString("(" + strings.Join(dataStrings, ",") + ")")
 			rowIndex++
