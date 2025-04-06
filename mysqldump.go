@@ -98,6 +98,7 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	_, _ = buf.WriteString("-- Database Name: " + dbName + "\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString("\n\n")
+	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=0;\n")
 
 	_, err = db.Exec(fmt.Sprintf("USE `%s`", dbName))
 	if err != nil {
@@ -143,7 +144,7 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	}
 
 	// 导出每个表的结构和数据
-
+	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=1;\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString("-- Dumped by mysqldump\n")
 	_, _ = buf.WriteString("-- Maintained by Yusta (https://github.com/NotYusta)\n")
@@ -168,79 +169,6 @@ func getCreateTableSQL(db *sql.DB, table string) (string, error) {
 	return createTableSQL, nil
 }
 
-func getForeignKeyRelationships(db *sql.DB, table string) ([]string, error) {
-	var foreignKeys []string
-	query := `
-		SELECT TABLE_NAME 
-		FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-		WHERE REFERENCED_TABLE_NAME = ?`
-	rows, err := db.Query(query, table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var dependentTable string
-		if err := rows.Scan(&dependentTable); err != nil {
-			return nil, err
-		}
-		foreignKeys = append(foreignKeys, dependentTable)
-	}
-	return foreignKeys, nil
-}
-
-// Sort tables based on foreign key dependencies
-func sortTablesByDependency(db *sql.DB, tables []string) ([]string, error) {
-	var sortedTables []string
-	visited := make(map[string]bool)
-	var result []string
-
-	// Use depth-first search (DFS) to traverse the tables in dependency order
-	var visit func(table string) error
-	visit = func(table string) error {
-		if visited[table] {
-			return nil
-		}
-		visited[table] = true
-
-		// Find tables that the current table is referenced by
-		foreignKeys, err := getForeignKeyRelationships(db, table)
-		if err != nil {
-			return err
-		}
-
-		// Visit tables that the current table depends on
-		for _, foreignKey := range foreignKeys {
-			if !visited[foreignKey] {
-				if err := visit(foreignKey); err != nil {
-					return err
-				}
-			}
-		}
-
-		// After visiting all dependencies, add the current table
-		result = append(result, table)
-		return nil
-	}
-
-	// Visit each table to ensure all dependencies are traversed
-	for _, table := range tables {
-		if !visited[table] {
-			if err := visit(table); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Reverse the result list to ensure the correct order
-	for i := len(result) - 1; i >= 0; i-- {
-		sortedTables = append(sortedTables, result[i])
-	}
-
-	return sortedTables, nil
-}
-
 func getAllTables(db *sql.DB) ([]string, error) {
 	var tables []string
 	rows, err := db.Query("SHOW TABLES")
@@ -258,7 +186,7 @@ func getAllTables(db *sql.DB) ([]string, error) {
 		tables = append(tables, table)
 	}
 
-	return sortTablesByDependency(db, tables)
+	return tables, nil
 }
 
 func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
@@ -266,7 +194,6 @@ func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString(fmt.Sprintf("-- Table structure for %s\n", table))
 	_, _ = buf.WriteString("-- ----------------------------\n")
-
 	createTableSQL, err := getCreateTableSQL(db, table)
 	if err != nil {
 		return err
