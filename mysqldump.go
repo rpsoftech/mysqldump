@@ -148,7 +148,7 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	_, _ = buf.WriteString("-- Dumped by mysqldump\n")
 	_, _ = buf.WriteString("-- Maintained by Yusta (https://github.com/NotYusta)\n")
 	_, _ = buf.WriteString("-- Cost Time: " + time.Since(start).String() + "\n")
-	_, _ = buf.WriteString("-- Completed Time: " + time.Now().Format("2006-01-02 15:04:05") + "\n")
+	_, _ = buf.WriteString("-- Complete Time: " + time.Now().Format("2006-01-02 15:04:05") + "\n")
 	_, _ = buf.WriteString("-- Table Counts: " + fmt.Sprintf("%d", len(tables)) + "\n")
 	_, _ = buf.WriteString("-- Table Rows: " + fmt.Sprintf("%d", allTotalRows) + "\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
