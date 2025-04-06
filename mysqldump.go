@@ -299,35 +299,43 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 	// Generate the column names for the INSERT statement
 	columnNames := strings.Join(columns, ",")
 
-	// Write the data for each row
-	for rows.Next() {
-		data := make([]*sql.NullString, len(columns))
-		ptrs := make([]interface{}, len(columns))
-		for i := range data {
-			ptrs[i] = &data[i]
-		}
+	if totalRow > 0 {
+		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES\n", table, columnNames))
 
-		// Read data
-		if err := rows.Scan(ptrs...); err != nil {
-			return err
-		}
-
-		dataStrings := make([]string, len(columns))
-
-		// Prepare the values
-		for key, value := range data {
-			if value != nil && value.Valid {
-				escaped := strings.ReplaceAll(value.String, "'", "''")
-				dataStrings[key] = "'" + escaped + "'"
-			} else {
-				dataStrings[key] = "NULL"
+		rowIndex := 0
+		for rows.Next() {
+			data := make([]*sql.NullString, len(columns))
+			ptrs := make([]interface{}, len(columns))
+			for i := range data {
+				ptrs[i] = &data[i]
 			}
-		}
-		
 
-		// Insert statement with column names
-		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", table, columnNames, strings.Join(dataStrings, ",")))
+			// Read data
+			if err := rows.Scan(ptrs...); err != nil {
+				return err
+			}
+
+			dataStrings := make([]string, len(columns))
+			for key, value := range data {
+				if value != nil && value.Valid {
+					escaped := strings.ReplaceAll(value.String, "'", "''")
+					dataStrings[key] = "'" + escaped + "'"
+				} else {
+					dataStrings[key] = "NULL"
+				}
+			}
+
+			if rowIndex > 0 {
+				buf.WriteString(",\n") // comma for previous row
+			}
+			buf.WriteString("(" + strings.Join(dataStrings, ",") + ")")
+			rowIndex++
+		}
+
+		buf.WriteString(";\n\n") // terminate the statement
 	}
+
+	buf.WriteString(");\n")
 
 	_, _ = buf.WriteString("\n\n")
 	return nil
