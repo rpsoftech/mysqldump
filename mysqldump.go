@@ -201,10 +201,13 @@ func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
 // 禁止 golangci-lint 检查
 // nolint: gocyclo
 func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
+	var totalRow uint64
+	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM `%s`", table))
+	row.Scan(&totalRow)
 
 	// 导出表数据
 	_, _ = buf.WriteString("-- ----------------------------\n")
-	_, _ = buf.WriteString(fmt.Sprintf("-- Records of %s\n", table))
+	_, _ = buf.WriteString(fmt.Sprintf("-- Records of %s (%d Rows)\n", table, totalRow))
 	_, _ = buf.WriteString("-- ----------------------------\n")
 
 	lineRows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`", table))
