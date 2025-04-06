@@ -249,7 +249,7 @@ func writeTableColumnData(buf *bufio.Writer, table string, row []interface{}, co
 
 	fmt.Printf("writing for %s\n", table)
 	for i, col := range row {
-		fmt.Printf("searching row [%d] for %s\n", i, row)
+		fmt.Printf("searching row [%d] for %s\n", i, table)
 		if col == nil {
 			ssql += "NULL"
 		} else {
