@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/notyusta/mysqldump"
+	"github.com/NotYusta/mysqldump"
 )
 
 func main() {
