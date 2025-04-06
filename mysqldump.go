@@ -317,11 +317,13 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 		// Prepare the values
 		for key, value := range data {
 			if value != nil && value.Valid {
-				dataStrings[key] = "'" + value.String + "'"
+				escaped := strings.ReplaceAll(value.String, "'", "''")
+				dataStrings[key] = "'" + escaped + "'"
 			} else {
 				dataStrings[key] = "NULL"
 			}
 		}
+		
 
 		// Insert statement with column names
 		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", table, columnNames, strings.Join(dataStrings, ",")))
