@@ -231,8 +231,11 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 	}
 
 	// Generate the column names for the INSERT statement
-	columnNames := strings.Join(columns, ",")
-
+	quotedColumns := make([]string, len(columns))
+	for i, col := range columns {
+		quotedColumns[i] = "`" + col + "`"
+	}
+	columnNames := strings.Join(quotedColumns, ",")
 	if totalRow > 0 {
 		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES ", table, columnNames))
 
