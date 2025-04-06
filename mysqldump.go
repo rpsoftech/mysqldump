@@ -247,7 +247,9 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 func writeTableColumnData(buf *bufio.Writer, table string, row []interface{}, columnTypes []*sql.ColumnType) (err error) {
 	ssql := "INSERT INTO `" + table + "` VALUES ("
 
+	fmt.Printf("writing for %s\n", table)
 	for i, col := range row {
+		fmt.Printf("searching row [%d] for %s\n", i, row)
 		if col == nil {
 			ssql += "NULL"
 		} else {
