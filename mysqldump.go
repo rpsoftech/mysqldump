@@ -234,7 +234,10 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 			return err
 		}
 
-		writeTableColumnData(buf, table, row, columnTypes)
+		err = writeTableColumnData(buf, table, row, columnTypes)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, _ = buf.WriteString("\n\n")
