@@ -21,6 +21,7 @@ func main() {
 
 	_ = mysqldump.Dump(
 		db,                           // DSN
+		"test",
 		mysqldump.WithDropTable(),    // Option: Delete table before create (Default: Not delete table)
 		mysqldump.WithData(),         // Option: Dump Data (Default: Only dump table schema)
 		mysqldump.WithTables("test"), // Option: Dump Tables (Default: All tables)

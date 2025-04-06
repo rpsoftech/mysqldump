@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -59,7 +60,7 @@ func (db *dbWrapper) Exec(query string, args ...interface{}) (sql.Result, error)
 // Source 加载
 // 禁止 golangci-lint 检查
 // nolint: gocyclo
-func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
+func Source(db *sql.DB, dbName string, reader io.Reader, opts ...SourceOption) error {
 	// 打印开始
 	var err error
 	var o sourceOption
@@ -71,7 +72,7 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	dbWrapper := newDBWrapper(db, o.dryRun, o.debug)
 
 	// Use database
-	_, err = dbWrapper.Exec("USE `mysql`")
+	_, err = dbWrapper.Exec(fmt.Sprintf("USE `%s`", dbName))
 	if err != nil {
 		return err
 	}

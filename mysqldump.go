@@ -66,7 +66,7 @@ func WithWriter(writer io.Writer) DumpOption {
 	}
 }
 
-func Dump(db *sql.DB, opts ...DumpOption) error {
+func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	// 打印开始
 	start := time.Now()
 	// 打印结束
@@ -98,9 +98,7 @@ func Dump(db *sql.DB, opts ...DumpOption) error {
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString("\n\n")
 
-	// 连接数据库
-
-	_, err = db.Exec("USE `mysql`")
+	_, err = db.Exec(fmt.Sprintf("USE `%s`", dbName))
 	if err != nil {
 		return err
 	}

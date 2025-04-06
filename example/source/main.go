@@ -21,6 +21,7 @@ func main() {
 
 	_ = mysqldump.Source(
 		db,
+		"test",
 		f,
 		mysqldump.WithMergeInsert(1000), // Option: Merge insert 1000 (Default: Not merge insert)
 		mysqldump.WithDebug(),           // Option: Print execute sql (Default: Not print execute sql)
