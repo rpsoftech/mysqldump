@@ -237,7 +237,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 	}
 	columnNames := strings.Join(quotedColumns, ",")
 	if totalRow > 0 {
-		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES ", table, columnNames))
+		buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES ", table, columnNames))
 
 		rowIndex := 0
 		for rows.Next() {
