@@ -130,9 +130,11 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 
 	}
 
+	allTotalRows := uint64(0)
 	if o.isData {
 		for _, table := range tables {
-			err = writeTableData(db, table, buf)
+			totalRows, err := writeTableData(db, table, buf)
+			allTotalRows += totalRows
 			if err != nil {
 				return err
 			}
@@ -143,7 +145,10 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString("-- Dumped by mysqldump\n")
+	_, _ = buf.WriteString("-- Maintained by Yusta (https://github.com/NotYusta)\n")
 	_, _ = buf.WriteString("-- Cost Time: " + time.Since(start).String() + "\n")
+	_, _ = buf.WriteString("-- Table Counts: " + fmt.Sprintf("%d", len(tables)) + "\n")
+	_, _ = buf.WriteString("-- Table Rows: " + fmt.Sprintf("%d", allTotalRows) + "\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	buf.Flush()
 
@@ -274,7 +279,7 @@ func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
 
 // 禁止 golangci-lint 检查
 // nolint: gocyclo
-func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
+func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error) {
 	var totalRow uint64
 	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM `%s`", table))
 	row.Scan(&totalRow)
@@ -286,14 +291,14 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`", table))
 	if err != nil {
-		return err
+		return totalRow, err
 	}
 	defer rows.Close()
 
 	var columns []string
 	columns, err = rows.Columns()
 	if err != nil {
-		return err
+		return totalRow, err
 	}
 
 	// Generate the column names for the INSERT statement
@@ -312,7 +317,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 
 			// Read data
 			if err := rows.Scan(ptrs...); err != nil {
-				return err
+				return totalRow, err
 			}
 
 			dataStrings := make([]string, len(columns))
@@ -336,5 +341,5 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 	}
 
 	_, _ = buf.WriteString("\n\n")
-	return nil
+	return totalRow, nil
 }
