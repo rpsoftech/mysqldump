@@ -222,13 +222,14 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 		return err
 	}
 
+	// Generate the column names for the INSERT statement
+	columnNames := strings.Join(columns, ",")
 
-
-	// updated to write directly to prevent large mem
+	// Write the data for each row
 	for rows.Next() {
 		data := make([]*sql.NullString, len(columns))
 		ptrs := make([]interface{}, len(columns))
-		for i, _ := range data {
+		for i := range data {
 			ptrs[i] = &data[i]
 		}
 
@@ -239,18 +240,19 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 
 		dataStrings := make([]string, len(columns))
 
+		// Prepare the values
 		for key, value := range data {
 			if value != nil && value.Valid {
 				dataStrings[key] = "'" + value.String + "'"
 			} else {
-				dataStrings[key] = "null"
+				dataStrings[key] = "NULL"
 			}
 		}
 
-		buf.WriteString("("+strings.Join(dataStrings, ",")+")")
+		// Insert statement with column names
+		buf.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", table, columnNames, strings.Join(dataStrings, ",")))
 	}
 
 	_, _ = buf.WriteString("\n\n")
 	return nil
 }
-
