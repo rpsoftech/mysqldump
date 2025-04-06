@@ -210,128 +210,47 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 	_, _ = buf.WriteString(fmt.Sprintf("-- Records of %s (%d Rows)\n", table, totalRow))
 	_, _ = buf.WriteString("-- ----------------------------\n")
 
-	lineRows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`", table))
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`", table))
 	if err != nil {
 		return err
 	}
-	defer lineRows.Close()
+	defer rows.Close()
 
 	var columns []string
-	columns, err = lineRows.Columns()
+	columns, err = rows.Columns()
 	if err != nil {
 		return err
 	}
 
-	columnTypes, err := lineRows.ColumnTypes()
-	if err != nil {
-		return err
-	}
+
 
 	// updated to write directly to prevent large mem
-	for lineRows.Next() {
-		row := make([]interface{}, len(columns))
-		rowPointers := make([]interface{}, len(columns))
-		for i := range columns {
-			rowPointers[i] = &row[i]
+	for rows.Next() {
+		data := make([]*sql.NullString, len(columns))
+		ptrs := make([]interface{}, len(columns))
+		for i, _ := range data {
+			ptrs[i] = &data[i]
 		}
-		err = lineRows.Scan(rowPointers...)
-		if err != nil {
+
+		// Read data
+		if err := rows.Scan(ptrs...); err != nil {
 			return err
 		}
 
-		err = writeTableColumnData(buf, table, row, columnTypes)
-		if err != nil {
-			return err
+		dataStrings := make([]string, len(columns))
+
+		for key, value := range data {
+			if value != nil && value.Valid {
+				dataStrings[key] = "'" + value.String + "'"
+			} else {
+				dataStrings[key] = "null"
+			}
 		}
+
+		buf.WriteString("("+strings.Join(dataStrings, ",")+")")
 	}
 
 	_, _ = buf.WriteString("\n\n")
 	return nil
 }
 
-func writeTableColumnData(buf *bufio.Writer, table string, row []interface{}, columnTypes []*sql.ColumnType) (err error) {
-	ssql := "INSERT INTO `" + table + "` VALUES ("
-
-	fmt.Printf("writing for %s\n", table)
-	for i, col := range row {
-		fmt.Printf("searching row [%d] for %s\n", i, table)
-		if col == nil {
-			ssql += "NULL"
-		} else {
-			Type := columnTypes[i].DatabaseTypeName()
-			// 去除 UNSIGNED 和空格
-			Type = strings.Replace(Type, "UNSIGNED", "", -1)
-			Type = strings.Replace(Type, " ", "", -1)
-			switch Type {
-			case "TINYINT", "SMALLINT", "MEDIUMINT", "INT", "INTEGER", "BIGINT":
-				if bs, ok := col.([]byte); ok {
-					ssql += string(bs)
-				} else {
-					ssql += fmt.Sprintf("%d", col)
-				}
-			case "FLOAT", "DOUBLE":
-				if bs, ok := col.([]byte); ok {
-					ssql += string(bs)
-				} else {
-					ssql += fmt.Sprintf("%f", col)
-				}
-			case "DECIMAL", "DEC":
-				ssql += fmt.Sprintf("%s", col)
-
-			case "DATE":
-				t, ok := col.(time.Time)
-				if !ok {
-					return err
-				}
-				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02"))
-			case "DATETIME":
-				t, ok := col.(time.Time)
-				if !ok {
-					return err
-				}
-				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05"))
-			case "TIMESTAMP":
-				t, ok := col.(time.Time)
-				if !ok {
-					return err
-				}
-				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05"))
-			case "TIME":
-				t, ok := col.([]byte)
-				if !ok {
-					return err
-				}
-				ssql += fmt.Sprintf("'%s'", string(t))
-			case "YEAR":
-				t, ok := col.([]byte)
-				if !ok {
-					return err
-				}
-				ssql += string(t)
-			case "CHAR", "VARCHAR", "TINYTEXT", "TEXT", "MEDIUMTEXT", "LONGTEXT":
-				ssql += fmt.Sprintf("'%s'", strings.Replace(fmt.Sprintf("%s", col), "'", "''", -1))
-			case "BIT", "BINARY", "VARBINARY", "TINYBLOB", "BLOB", "MEDIUMBLOB", "LONGBLOB":
-				ssql += fmt.Sprintf("0x%X", col)
-			case "ENUM", "SET":
-				ssql += fmt.Sprintf("'%s'", col)
-			case "BOOL", "BOOLEAN":
-				if col.(bool) {
-					ssql += "true"
-				} else {
-					ssql += "false"
-				}
-			case "JSON":
-				ssql += fmt.Sprintf("'%s'", col)
-			default:
-				// unsupported type
-				return fmt.Errorf("unsupported type: %s", Type)
-			}
-		}
-		if i < len(row)-1 {
-			ssql += ","
-		}
-	}
-	ssql += ");\n"
-	_, _ = buf.WriteString(ssql)
-	return
-}
