@@ -326,7 +326,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 			}
 
 			if rowIndex > 0 {
-				buf.WriteString(",") // comma for previous row
+				buf.WriteString(",\n") // comma for previous row
 			}
 			buf.WriteString("(" + strings.Join(dataStrings, ",") + ")")
 			rowIndex++
