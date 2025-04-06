@@ -128,8 +128,10 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 			return err
 		}
 
-		// 导出表数据
-		if o.isData {
+	}
+
+	if o.isData {
+		for _, table := range tables {
 			err = writeTableData(db, table, buf)
 			if err != nil {
 				return err
