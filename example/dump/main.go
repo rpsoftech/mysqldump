@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/jarvanstack/mysqldump"
+	"github.com/notyusta/mysqldump"
 )
 
 func main() {
 
-	dsn := "root:rootpasswd@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai"
+	dsn := "root:rootpasswd@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=true&loc=Asia%2FJakarta"
 
 	f, _ := os.Create("dump.sql")
 
