@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -13,10 +12,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func init() {
-	// 打印 日志 行数
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-}
+func init() {}
 
 type dumpOption struct {
 	// 导出表数据
@@ -73,13 +69,7 @@ func WithWriter(writer io.Writer) DumpOption {
 func Dump(db *sql.DB, opts ...DumpOption) error {
 	// 打印开始
 	start := time.Now()
-	log.Printf("[info] [dump] start at %s\n", start.Format("2006-01-02 15:04:05"))
 	// 打印结束
-	defer func() {
-		end := time.Now()
-		log.Printf("[info] [dump] end at %s, cost %s\n", end.Format("2006-01-02 15:04:05"), end.Sub(start))
-	}()
-
 	var err error
 
 	var o dumpOption
@@ -112,7 +102,6 @@ func Dump(db *sql.DB, opts ...DumpOption) error {
 
 	_, err = db.Exec("USE `mysql`")
 	if err != nil {
-		log.Printf("[error] %v \n", err)
 		return err
 	}
 
@@ -121,7 +110,6 @@ func Dump(db *sql.DB, opts ...DumpOption) error {
 	if o.isAllTable {
 		tmp, err := getAllTables(db)
 		if err != nil {
-			log.Printf("[error] %v \n", err)
 			return err
 		}
 		tables = tmp
@@ -139,7 +127,6 @@ func Dump(db *sql.DB, opts ...DumpOption) error {
 		// 导出表结构
 		err = writeTableStruct(db, table, buf)
 		if err != nil {
-			log.Printf("[error] %v \n", err)
 			return err
 		}
 
@@ -147,7 +134,6 @@ func Dump(db *sql.DB, opts ...DumpOption) error {
 		if o.isData {
 			err = writeTableData(db, table, buf)
 			if err != nil {
-				log.Printf("[error] %v \n", err)
 				return err
 			}
 		}
@@ -202,7 +188,6 @@ func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
 
 	createTableSQL, err := getCreateTableSQL(db, table)
 	if err != nil {
-		log.Printf("[error] %v \n", err)
 		return err
 	}
 	_, _ = buf.WriteString(createTableSQL)
@@ -224,7 +209,6 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 
 	lineRows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`", table))
 	if err != nil {
-		log.Printf("[error] %v \n", err)
 		return err
 	}
 	defer lineRows.Close()
@@ -232,13 +216,11 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 	var columns []string
 	columns, err = lineRows.Columns()
 	if err != nil {
-		log.Printf("[error] %v \n", err)
 		return err
 	}
 
 	columnTypes, err := lineRows.ColumnTypes()
 	if err != nil {
-		log.Printf("[error] %v \n", err)
 		return err
 	}
 
@@ -251,7 +233,6 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) error {
 		}
 		err = lineRows.Scan(rowPointers...)
 		if err != nil {
-			log.Printf("[error] %v \n", err)
 			return err
 		}
 
@@ -292,35 +273,30 @@ func writeTableColumnData(buf *bufio.Writer, table string, row []interface{}, co
 			case "DATE":
 				t, ok := col.(time.Time)
 				if !ok {
-					log.Println("DATE 类型转换错误")
 					return err
 				}
 				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02"))
 			case "DATETIME":
 				t, ok := col.(time.Time)
 				if !ok {
-					log.Println("DATETIME 类型转换错误")
 					return err
 				}
 				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05"))
 			case "TIMESTAMP":
 				t, ok := col.(time.Time)
 				if !ok {
-					log.Println("TIMESTAMP 类型转换错误")
 					return err
 				}
 				ssql += fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05"))
 			case "TIME":
 				t, ok := col.([]byte)
 				if !ok {
-					log.Println("TIME 类型转换错误")
 					return err
 				}
 				ssql += fmt.Sprintf("'%s'", string(t))
 			case "YEAR":
 				t, ok := col.([]byte)
 				if !ok {
-					log.Println("YEAR 类型转换错误")
 					return err
 				}
 				ssql += string(t)
@@ -340,7 +316,6 @@ func writeTableColumnData(buf *bufio.Writer, table string, row []interface{}, co
 				ssql += fmt.Sprintf("'%s'", col)
 			default:
 				// unsupported type
-				log.Printf("unsupported type: %s", Type)
 				return fmt.Errorf("unsupported type: %s", Type)
 			}
 		}

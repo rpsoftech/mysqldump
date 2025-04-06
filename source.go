@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
-	"log"
 	"strings"
-	"time"
 )
 
 type sourceOption struct {
@@ -52,10 +50,6 @@ func newDBWrapper(db *sql.DB, dryRun, debug bool) *dbWrapper {
 }
 
 func (db *dbWrapper) Exec(query string, args ...interface{}) (sql.Result, error) {
-	if db.debug {
-		log.Printf("[debug] [query]\n%s\n", query)
-	}
-
 	if db.dryRun {
 		return nil, nil
 	}
@@ -67,14 +61,6 @@ func (db *dbWrapper) Exec(query string, args ...interface{}) (sql.Result, error)
 // nolint: gocyclo
 func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	// 打印开始
-	start := time.Now()
-	log.Printf("[info] [source] start at %s\n", start.Format("2006-01-02 15:04:05"))
-	// 打印结束
-	defer func() {
-		end := time.Now()
-		log.Printf("[info] [source] end at %s, cost %s\n", end.Format("2006-01-02 15:04:05"), end.Sub(start))
-	}()
-
 	var err error
 	var o sourceOption
 	for _, opt := range opts {
@@ -87,7 +73,6 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	// Use database
 	_, err = dbWrapper.Exec("USE `mysql`")
 	if err != nil {
-		log.Printf("[error] %v\n", err)
 		return err
 	}
 
@@ -99,7 +84,6 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	// 关闭事务
 	_, err = dbWrapper.Exec("SET autocommit=0;")
 	if err != nil {
-		log.Printf("[error] %v\n", err)
 		return err
 	}
 
@@ -109,7 +93,6 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 			if err == io.EOF {
 				break
 			}
-			log.Printf("[error] %v\n", err)
 			return err
 		}
 
@@ -118,7 +101,6 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 		// 删除末尾的换行符
 		ssql = trim(ssql)
 		if err != nil {
-			log.Printf("[error] [trim] %v\n", err)
 			return err
 		}
 
@@ -132,14 +114,12 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 					if err == io.EOF {
 						break
 					}
-					log.Printf("[error] %v\n", err)
 					return err
 				}
 
 				ssql2 := string(line)
 				ssql2 = trim(ssql2)
 				if err != nil {
-					log.Printf("[error] [trim] %v\n", err)
 					return err
 				}
 				if strings.HasPrefix(ssql2, "INSERT INTO") {
@@ -152,14 +132,12 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 			// 合并 INSERT
 			ssql, err = mergeInsert(insertSQLs)
 			if err != nil {
-				log.Printf("[error] [mergeInsert] %v\n", err)
 				return err
 			}
 		}
 
 		_, err = dbWrapper.Exec(ssql)
 		if err != nil {
-			log.Printf("[error] %v\n", err)
 			return err
 		}
 	}
@@ -167,14 +145,12 @@ func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	// 提交事务
 	_, err = dbWrapper.Exec("COMMIT;")
 	if err != nil {
-		log.Printf("[error] %v\n", err)
 		return err
 	}
 
 	// 开启事务
 	_, err = dbWrapper.Exec("SET autocommit=1;")
 	if err != nil {
-		log.Printf("[error] %v\n", err)
 		return err
 	}
 
