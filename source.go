@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"database/sql"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -66,7 +65,7 @@ func (db *dbWrapper) Exec(query string, args ...interface{}) (sql.Result, error)
 // Source 加载
 // 禁止 golangci-lint 检查
 // nolint: gocyclo
-func Source(dsn string, reader io.Reader, opts ...SourceOption) error {
+func Source(db *sql.DB, reader io.Reader, opts ...SourceOption) error {
 	// 打印开始
 	start := time.Now()
 	log.Printf("[info] [source] start at %s\n", start.Format("2006-01-02 15:04:05"))
@@ -77,31 +76,16 @@ func Source(dsn string, reader io.Reader, opts ...SourceOption) error {
 	}()
 
 	var err error
-	var db *sql.DB
 	var o sourceOption
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	dbName, err := GetDBNameFromDSN(dsn)
-	if err != nil {
-		log.Printf("[error] %v\n", err)
-		return err
-	}
-
-	// Open database
-	db, err = sql.Open("mysql", dsn)
-	if err != nil {
-		log.Printf("[error] %v\n", err)
-		return err
-	}
-	defer db.Close()
-
 	// DB Wrapper
 	dbWrapper := newDBWrapper(db, o.dryRun, o.debug)
 
 	// Use database
-	_, err = dbWrapper.Exec(fmt.Sprintf("USE %s;", dbName))
+	_, err = dbWrapper.Exec("USE `mysql`")
 	if err != nil {
 		log.Printf("[error] %v\n", err)
 		return err
