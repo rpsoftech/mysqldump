@@ -230,16 +230,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 		return totalRow, err
 	}
 
-	// Generate the column names for the INSERT statement
-	quotedColumns := make([]string, len(columns))
-	for i, col := range columns {
-		quotedColumns[i] = "`" + col + "`"
-	}
-	columnNames := strings.Join(quotedColumns, ",")
 	if totalRow > 0 {
-		buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES ", table, columnNames))
-
-		rowIndex := 0
 		for rows.Next() {
 			data := make([]*sql.NullString, len(columns))
 			ptrs := make([]interface{}, len(columns))
@@ -262,11 +253,7 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 				}
 			}
 
-			if rowIndex > 0 {
-				buf.WriteString(",\n") // comma for previous row
-			}
-			buf.WriteString("(" + strings.Join(dataStrings, ",") + ")")
-			rowIndex++
+			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` VALUES %s;", table, "("+strings.Join(dataStrings, ",")+")"))
 		}
 
 		buf.WriteString(";\n\n") // terminate the statement
