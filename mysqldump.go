@@ -253,10 +253,8 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 				}
 			}
 
-			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` VALUES %s;", table, "("+strings.Join(dataStrings, ",")+")"))
+			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` VALUES %s;\n", table, "("+strings.Join(dataStrings, ",")+")"))
 		}
-
-		buf.WriteString(";\n\n") // terminate the statement
 	}
 
 	_, _ = buf.WriteString("\n\n")
