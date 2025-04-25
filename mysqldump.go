@@ -97,8 +97,7 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	_, _ = buf.WriteString("-- Start Time: " + start.Format("2006-01-02 15:04:05") + "\n")
 	_, _ = buf.WriteString("-- Database Name: " + dbName + "\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
-	_, _ = buf.WriteString("\n\n")
-	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=0;\n")
+	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=0;\n\n")
 
 	_, err = db.Exec(fmt.Sprintf("USE `%s`", dbName))
 	if err != nil {
@@ -198,11 +197,7 @@ func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, _ = buf.WriteString(createTableSQL)
-	_, _ = buf.WriteString(";")
-
-	_, _ = buf.WriteString("\n\n")
-	_, _ = buf.WriteString("\n\n")
+	_, _ = buf.WriteString(fmt.Sprintf("%s;\n\n", createTableSQL))
 	return nil
 }
 
@@ -257,6 +252,6 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 		}
 	}
 
-	_, _ = buf.WriteString("\n\n")
+	_, _ = buf.WriteString("\n")
 	return totalRow, nil
 }
