@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/NotYusta/mysqldump"
+	"github.com/rpsoftech/mysqldump"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	f, _ := os.Create("dump.sql")
 
 	_ = mysqldump.Dump(
-		db,                           // DSN
+		db, // DSN
 		"test",
 		mysqldump.WithDropTable(),    // Option: Delete table before create (Default: Not delete table)
 		mysqldump.WithData(),         // Option: Dump Data (Default: Only dump table schema)

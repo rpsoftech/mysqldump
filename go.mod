@@ -1,4 +1,4 @@
-module github.com/NotYusta/mysqldump
+module github.com/rpsoftech/mysqldump
 
 go 1.23
 
