@@ -159,10 +159,34 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 
 func getCreateTableSQL(db *sql.DB, table string) (string, error) {
 	var createTableSQL string
-	err := db.QueryRow(fmt.Sprintf("SHOW CREATE TABLE `%s`", table)).Scan(&table, &createTableSQL)
+
+	rows, err := db.Query(fmt.Sprintf("SHOW CREATE TABLE `%s`", table))
 	if err != nil {
 		return "", err
 	}
+	columns, err := rows.Columns()
+	if err != nil {
+		return "", err
+	} else if len(columns) < 2 {
+		return "", fmt.Errorf("less then 2 columns found on querying table %s", table)
+	}
+	extras := make([]any, len(columns))
+	extras[1] = &createTableSQL
+	extras[0] = &table
+	if !rows.Next() {
+		return "", fmt.Errorf("table %s not found", table)
+	}
+	var notNeededData string
+	if len(columns) > 2 {
+		for i := 2; i < len(columns); i++ {
+			extras[i] = &notNeededData
+		}
+	}
+	err = rows.Scan(extras...)
+	if err != nil {
+		return "", err
+	}
+	rows.Close()
 	// IF NOT EXISTS
 	createTableSQL = strings.Replace(createTableSQL, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1)
 	return createTableSQL, nil
