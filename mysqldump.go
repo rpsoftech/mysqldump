@@ -257,6 +257,8 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 	columnNames := strings.Join(quotedColumns, ",")
 
 	if totalRow > 0 {
+		dataValueString := []string{}
+		rowNumber := 0
 		for rows.Next() {
 			data := make([]*sql.NullString, len(columns))
 			ptrs := make([]interface{}, len(columns))
@@ -278,8 +280,16 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 					dataStrings[key] = "NULL"
 				}
 			}
-
-			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, "("+strings.Join(dataStrings, ",")+")"))
+			dataValueString = append(dataValueString, "("+strings.Join(dataStrings, ",")+")")
+			rowNumber += 1
+			if rowNumber >= 100 {
+				buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, strings.Join(dataValueString, ",")))
+				rowNumber = 0
+				dataValueString = []string{}
+			}
+		}
+		if rowNumber > 0 {
+			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, strings.Join(dataValueString, ",")))
 		}
 	}
 
