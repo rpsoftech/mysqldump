@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,11 +21,16 @@ type dumpOption struct {
 
 	// 导出指定表, 与 isAllTables 互斥, isAllTables 优先级高
 	tables []string
+
+	views []string
 	// 导出全部表
 	isAllTable bool
 	// 是否删除表
-	isDropTable bool
-
+	isDropTable     bool
+	isDropView      bool
+	isAllViews      bool
+	withUseDatabase bool
+	withTransaction bool
 	// writer 默认为 os.Stdout
 	writer io.Writer
 }
@@ -35,6 +41,11 @@ type DumpOption func(*dumpOption)
 func WithDropTable() DumpOption {
 	return func(option *dumpOption) {
 		option.isDropTable = true
+	}
+}
+func WithDropViews() DumpOption {
+	return func(option *dumpOption) {
+		option.isDropView = true
 	}
 }
 
@@ -51,11 +62,32 @@ func WithTables(tables ...string) DumpOption {
 		option.tables = tables
 	}
 }
+func WithViews(views ...string) DumpOption {
+	return func(option *dumpOption) {
+		option.views = views
+	}
+}
 
 // 导出全部表
 func WithAllTable() DumpOption {
 	return func(option *dumpOption) {
 		option.isAllTable = true
+	}
+}
+func WithUseDatabase() DumpOption {
+	return func(option *dumpOption) {
+		option.withUseDatabase = true
+	}
+}
+func WithTransaction() DumpOption {
+	return func(option *dumpOption) {
+		option.withTransaction = true
+	}
+}
+
+func WithAllViews() DumpOption {
+	return func(option *dumpOption) {
+		option.isAllViews = true
 	}
 }
 
@@ -83,6 +115,11 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 		o.isAllTable = true
 	}
 
+	if len(o.views) == 0 && !o.isAllViews {
+		// 默认包含全部表
+		o.isAllViews = false
+	}
+
 	if o.writer == nil {
 		// 默认输出到 os.Stdout
 		o.writer = os.Stdout
@@ -97,8 +134,14 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 	_, _ = buf.WriteString("-- Start Time: " + start.Format("2006-01-02 15:04:05") + "\n")
 	_, _ = buf.WriteString("-- Database Name: " + dbName + "\n")
 	_, _ = buf.WriteString("-- ----------------------------\n")
+	if o.withTransaction {
+		_, _ = buf.WriteString("SET AUTOCOMMIT=0;\n")
+		_, _ = buf.WriteString("START TRANSACTION;\n\n")
+	}
+	if o.withUseDatabase {
+		_, _ = buf.WriteString(fmt.Sprintf("USE `%s`;\n\n", dbName))
+	}
 	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=0;\n\n")
-
 	_, err = db.Exec(fmt.Sprintf("USE `%s`", dbName))
 	if err != nil {
 		return err
@@ -106,6 +149,7 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 
 	// 2. 获取表
 	var tables []string
+
 	if o.isAllTable {
 		tmp, err := getAllTables(db)
 		if err != nil {
@@ -116,6 +160,28 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 		tables = o.tables
 	}
 
+	var views []string
+
+	tmp, err := getAllViews(db)
+	//Remove views from tables
+	for _, view := range tmp {
+		index := slices.Index(tables, view)
+		if index != -1 {
+			// Remove the element at the found index
+			tables = slices.Delete(tables, index, index+1)
+		}
+
+	}
+	if o.isAllViews {
+		if err != nil {
+			return err
+		}
+		views = tmp
+	} else {
+		views = o.views
+	}
+
+	allTotalRows := uint64(0)
 	// 3. 导出表
 	for _, table := range tables {
 		// 删除表
@@ -128,22 +194,48 @@ func Dump(db *sql.DB, dbName string, opts ...DumpOption) error {
 		if err != nil {
 			return err
 		}
-
-	}
-
-	allTotalRows := uint64(0)
-	if o.isData {
-		for _, table := range tables {
+		if o.isData {
+			_, _ = buf.WriteString(fmt.Sprintf("LOCK TABLES `%s` WRITE; \n\n", table))
 			totalRows, err := writeTableData(db, table, buf)
+			_, _ = buf.WriteString("UNLOCK TABLES;\n\n")
 			allTotalRows += totalRows
 			if err != nil {
 				return err
 			}
 		}
 	}
+	// Committing transaction so Views Can Be Defined Without Issues
+	if o.withTransaction {
+		_, _ = buf.WriteString("COMMIT;\n")
+		_, _ = buf.WriteString("SET AUTOCOMMIT=1;\n")
+	}
+	// 4. Views
+
+	for _, view := range views {
+		// 删除表
+		if o.isDropView {
+			_, _ = buf.WriteString(fmt.Sprintf("DROP VIEW IF EXISTS `%s`;\n", view))
+		}
+
+		// 导出表结构
+		err = writeTableStruct(db, view, buf)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Again Starting Transaction For Data Insertion
+	if o.withTransaction {
+		_, _ = buf.WriteString("SET AUTOCOMMIT=0;\n")
+		_, _ = buf.WriteString("START TRANSACTION;\n\n")
+	}
 
 	// 导出每个表的结构和数据
 	_, _ = buf.WriteString("SET FOREIGN_KEY_CHECKS=1;\n")
+	if o.withTransaction {
+		_, _ = buf.WriteString("COMMIT;\n")
+		_, _ = buf.WriteString("SET AUTOCOMMIT=1;\n")
+	}
 	_, _ = buf.WriteString("-- ----------------------------\n")
 	_, _ = buf.WriteString("-- Dumped by mysqldump\n")
 	_, _ = buf.WriteString("-- Maintained by Yusta (https://github.com/NotYusta)\n")
@@ -210,6 +302,23 @@ func getAllTables(db *sql.DB) ([]string, error) {
 	}
 
 	return tables, nil
+}
+func getAllViews(db *sql.DB) ([]string, error) {
+	var views []string
+	rows, err := db.Query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE = 'VIEW'")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var table string
+		err = rows.Scan(&table)
+		if err != nil {
+			return nil, err
+		}
+		views = append(views, table)
+	}
+	return views, nil
 }
 
 func writeTableStruct(db *sql.DB, table string, buf *bufio.Writer) error {
@@ -282,17 +391,26 @@ func writeTableData(db *sql.DB, table string, buf *bufio.Writer) (uint64, error)
 			}
 			dataValueString = append(dataValueString, "("+strings.Join(dataStrings, ",")+")")
 			rowNumber += 1
-			if rowNumber >= 100 {
-				buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, strings.Join(dataValueString, ",")))
+			if rowNumber >= 600 {
+				writeDataInsertToBuffer(table, columnNames, dataValueString, buf)
 				rowNumber = 0
 				dataValueString = []string{}
 			}
 		}
 		if rowNumber > 0 {
-			buf.WriteString(fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, strings.Join(dataValueString, ",")))
+			writeDataInsertToBuffer(table, columnNames, dataValueString, buf)
 		}
 	}
 
 	_, _ = buf.WriteString("\n")
 	return totalRow, nil
+}
+
+func writeDataInsertToBuffer(table string, columnNames string, dataValueString []string, buf *bufio.Writer) {
+	s := fmt.Sprintf("INSERT INTO `%s` (%s) VALUES %s;\n", table, columnNames, strings.Join(dataValueString, ","))
+	s = strings.ReplaceAll(s, "\\'", "\\\\'")
+	// s = strings.ReplaceAll(s, "')", "`)")
+	// s = strings.ReplaceAll(s, "',", "`,")
+	// s = strings.ReplaceAll(s, ",'", ",`")
+	buf.WriteString(s)
 }
